@@ -13,4 +13,4 @@ store the output locally, you can stream it directly to an S3 bucket.
 
 here it is in action creating a 35gb spreadsheet:
 
-[screenshot of `top` display](https://github.com/jcomeauictx/bigdata/images/screenshot.png "bigdata in action")
+[screenshot of `top` display](https://github.com/jcomeauictx/bigdata/blob/master/images/screenshot.png "bigdata in action")
