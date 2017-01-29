@@ -85,7 +85,7 @@ def build_dict(filename, key):
                 if not trimmed in data[rowkey]:
                     data[rowkey].append(trimmed)
                 else:
-                    logging.warn('Discarding duplicate row'
+                    logging.debug('Discarding duplicate row'
                                  ' in right-hand table: %s',
                                  trimmed)
             else:

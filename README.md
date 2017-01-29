@@ -10,3 +10,7 @@ input files.
 it's not fast enough yet, but as long as the tables to which you're joining
 are small, it fits easily in RAM, and using `aws s3 cp`, you don't need to
 store the output locally, you can stream it directly to an S3 bucket.
+
+here it is in action creating a 35gb spreadsheet:
+
+[screenshot of `top` display](https://github.com/jcomeauictx/bigdata/images/screenshot.png "bigdata in action")
