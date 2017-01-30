@@ -10,6 +10,7 @@ and removes every header _except for the very first one_.
 '''
 from __future__ import print_function
 import sys, os
+sys.setcheckinterval(1000000000)
 
 def process():
     sent_header = None

@@ -17,6 +17,7 @@ file in RAM!
 from __future__ import print_function
 import sys, os, csv, logging
 logging.basicConfig(level=logging.DEBUG if __debug__ else logging.INFO)
+sys.setcheckinterval(1000000000)
 
 def process():
     reader = csv.reader(sys.stdin, delimiter='|')

@@ -16,6 +16,7 @@ from __future__ import print_function
 import sys, os, csv, logging
 from collections import defaultdict
 logging.basicConfig(level=logging.DEBUG if __debug__ else logging.INFO)
+sys.setcheckinterval(1000000000)
 
 COMMAND = os.path.splitext(os.path.basename(sys.argv[0]))[0]
 DOCTESTDEBUG = logging.debug if COMMAND == 'doctest' else lambda *args: None
