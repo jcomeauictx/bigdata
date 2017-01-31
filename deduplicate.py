@@ -1,9 +1,10 @@
 #!/usr/bin/python -OO
 '''
-remove duplicates with condition.
+remove duplicates with (simple) condition.
 '''
 from __future__ import print_function
 import sys, os, csv, logging
+from collections import OrderedDict
 logging.basicConfig(level=logging.DEBUG if __debug__ else logging.INFO)
 sys.setcheckinterval(1000000000)
 # http://stackoverflow.com/a/41856587/493161
@@ -24,29 +25,34 @@ def process(columns):
     b and c have been output before and column c is 0.
 
     >>> from io import BytesIO
-    >>> sys.stdin = BytesIO('a,b,c\n,1,2,0\n2,3,0\n3,2,0\n4,2,0\n,5,2,1\n')
+    >>> sys.stdin = BytesIO('a,b,c\n1,2,0\n2,3,0\n3,2,0\n4,2,0\n5,2,1\n')
     >>> process(['_all_', 'b', '_all_', 'c', '0'])
+    1,2,0
+    2,3,0
+    5,2,1
     '''
     reader = csv.reader(sys.stdin)
     writer = csv.writer(sys.stdout, lineterminator='\n')
     header = reader.next()
     all_marker = columns.pop(0)
     # sweet one-liner from http://stackoverflow.com/a/3125186/493161
-    conditions = dict(map(None, *([iter(columns)] * 2)))
-    DOCTESTDEBUG('conditions: %s', conditions)
-    duplicates = []
+    check = OrderedDict([k,
+        (lambda arg: True) if v == all_marker else
+        (lambda arg: arg == v)] for k, v in map(None, *([iter(columns)] * 2)))
+    DOCTESTDEBUG('check: %s', check)
+    seen = {}
     def is_duplicate(row):
         '''
         inner function has side effects, building the duplicates list as it
         goes.
         '''
-        rowdict = dict(zip(header, row))
-        columns = [rowdict[c] if conditions[c] != all_marker else all_marker
-                   for c in conditions]
-        DOCTESTDEBUG('columns: %s', columns)
-        answer = True if columns in duplicates else False
-        duplicates.append(columns)
-        DOCTESTDEBUG('duplicates: %s', duplicates)
+        rowdict = OrderedDict(zip(header, row))
+        query = tuple([rowdict[c] for c in check])
+        checked = [check[c](rowdict[c]) for c in check]
+        answer = query in seen
+        if all(checked):
+            seen[query] = checked
+        DOCTESTDEBUG('seen: %s, answer=%s', seen, answer)
         return answer
     for row in reader:
         if not is_duplicate(row):
