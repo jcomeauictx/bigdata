@@ -6,6 +6,14 @@ from __future__ import print_function
 import sys, os, csv, logging
 logging.basicConfig(level=logging.DEBUG if __debug__ else logging.INFO)
 sys.setcheckinterval(1000000000)
+# http://stackoverflow.com/a/41856587/493161
+COMMAND = os.path.splitext(os.path.basename(sys.argv[0]))[0]
+if COMMAND in ['doctest', 'pydoc']:
+    NONDOCTESTPRINT = lambda *args, **kwargs: None
+    DOCTESTDEBUG = logging.debug
+else:
+    NONDOCTESTPRINT = print
+    DOCTESTDEBUG = lambda *args, **kwargs: None
 
 def process(columns):
     r'''
@@ -25,6 +33,7 @@ def process(columns):
     all_marker = columns.pop(0)
     # sweet one-liner from http://stackoverflow.com/a/3125186/493161
     conditions = dict(map(None, *([iter(columns)] * 2)))
+    DOCTESTDEBUG('conditions: %s', conditions)
     duplicates = []
     def is_duplicate(row):
         '''
@@ -34,8 +43,10 @@ def process(columns):
         rowdict = dict(zip(header, row))
         columns = [rowdict[c] if conditions[c] != all_marker else all_marker
                    for c in conditions]
+        DOCTESTDEBUG('columns: %s', columns)
         answer = True if columns in duplicates else False
         duplicates.append(columns)
+        DOCTESTDEBUG('duplicates: %s', duplicates)
         return answer
     for row in reader:
         if not is_duplicate(row):
