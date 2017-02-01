@@ -40,13 +40,15 @@ def process(columns):
         (lambda arg: True) if v == all_marker else
         (lambda arg: arg == v)] for k, v in map(None, *([iter(columns)] * 2)))
     DOCTESTDEBUG('check: %s', check)
+    additional = dict([[k[1:], check.pop(k)] for k in list(check)
+                      if k.startswith('&')])
     seen = {}
-    def is_duplicate(row):
+
+    def is_duplicate(rowdict):
         '''
-        inner function has side effects, building the duplicates list as it
+        inner function has a side effect, building the duplicates list as it
         goes.
         '''
-        rowdict = OrderedDict(zip(header, row))
         query = tuple([rowdict[c] for c in check])
         checked = [check[c](rowdict[c]) for c in check]
         answer = query in seen
@@ -54,8 +56,16 @@ def process(columns):
             seen[query] = checked
         DOCTESTDEBUG('seen: %s, answer=%s', seen, answer)
         return answer
+
+    def is_match(rowdict):
+        '''
+        additional value checks beyond what counts as 'duplicate'
+        '''
+        return all([additional[c](rowdict[c]) for c in additional])
+
     for row in reader:
-        if not is_duplicate(row):
+        rowdict = OrderedDict(zip(header, row))
+        if not (is_duplicate(rowdict) and is_match(rowdict)):
             writer.writerow(row)
 
 if __name__ == '__main__':
