@@ -90,7 +90,7 @@ def process(all_or_all_but_one, any_value, *columns):
             is_duplicate(rowdict) # just populate the `seen` dictionary
         for row in rowbuffer:
             rowdict = OrderedDict(zip(header, row))
-            if not is_duplicate(rowdict, True) and is_match(rowdict)):
+            if (not is_duplicate(rowdict, True)) and is_match(rowdict):
                 writer.writerow(row)
 
 if __name__ == '__main__':
