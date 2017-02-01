@@ -37,21 +37,44 @@ def process(all_or_all_but_one, any_value, *columns):
     1,2,0
     2,3,0
     5,2,1
+
+    the next example shows that a prepended '!' to the column name reverses
+    the check, and requires column c to *not* be '#'.
+    >>> sys.stdin = BytesIO('a,b,c\n1,2,0\n2,2,#\n3,3,#\n4,2,#\n')
+    >>> process('all but one', '_any_', 'b', '_any_', '!c', '#')
+    1,2,0
+    2,2,#
+    3,3,#
+
+    the final example shows an additional feature, that of prepending a '&'
+    to show that the column should not be counted towards duplicates but
+    should be a condition for printing.
     >>> sys.stdin = BytesIO('a,b,c\n1,2,0\n2,2,0\n3,2,1\n')
-    >>> process('all', '_any_', 'b', '_any_', 'c', '0')
+    >>> process('all', '_any_', 'b', '_any_', '&c', '0')
     3,2,1
     '''
     reader = csv.reader(sys.stdin)
     writer = csv.writer(sys.stdout, lineterminator='\n')
     header = reader.next()
+    check, additional, seen = OrderedDict({}), {}, defaultdict(int)
     # sweet one-liner from http://stackoverflow.com/a/3125186/493161
-    check = OrderedDict([k,
-        (lambda arg: True) if v == any_value else
-        (lambda arg: arg == v)] for k, v in map(None, *([iter(columns)] * 2)))
-    DOCTESTDEBUG('check: %s', check)
-    additional = dict([[k[1:], check.pop(k)] for k in list(check)
-                      if k.startswith('&')])
-    seen = defaultdict(int)
+    for k, v in map(None, *([iter(columns)] * 2)):
+        if k.startswith('&'):
+            if k[1:].startswith('!'):
+                # makes no sense with any_value but honor it anyway...
+                additional[k[2:]] = (lambda arg: False if v == any_value else
+                                     lambda arg: arg != v)
+            else:
+                additional[k[1:]] = (lambda arg: True if v == any_value else
+                                     lambda arg: arg == v)
+        elif k.startswith('!'):
+            # makes no sense with any_value but honor it anyway...
+            check[k[1:]] = (lambda arg: False if v == any_value else
+                            lambda arg: arg != v)
+        else:
+            check[k] = (lambda arg: True if v == any_value else
+                        lambda arg: arg != v)
+    DOCTESTDEBUG('check: %s, additional: %s', check, additional)
 
     def is_duplicate(rowdict, already_built=False):
         '''
@@ -64,9 +87,10 @@ def process(all_or_all_but_one, any_value, *columns):
             checked = [check[c](rowdict[c]) for c in check]
             if all(checked):
                 seen[query] += 1
+            DOCTESTDEBUG('seen (unbuilt): %s, answer=%s', seen, answer)
         else:
             answer = (seen[query] > 1)
-        DOCTESTDEBUG('seen: %s, answer=%s', seen, answer)
+            DOCTESTDEBUG('seen (built): %s, answer=%s', seen, answer)
         return answer
 
     def is_match(rowdict):
