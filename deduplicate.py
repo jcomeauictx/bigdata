@@ -56,24 +56,31 @@ def process(all_or_all_but_one, any_value, *columns):
     reader = csv.reader(sys.stdin)
     writer = csv.writer(sys.stdout, lineterminator='\n')
     header = reader.next()
-    check, additional, seen = OrderedDict({}), {}, defaultdict(int)
+    check, additional, seen = OrderedDict({}), OrderedDict({}), defaultdict(int)
     # sweet one-liner from http://stackoverflow.com/a/3125186/493161
     for k, v in map(None, *([iter(columns)] * 2)):
         if k.startswith('&'):
+            DOCTESTDEBUG('adding additional check for %s == %s', k[1:], v)
             if k[1:].startswith('!'):
                 # makes no sense with any_value but honor it anyway...
-                additional[k[2:]] = (lambda arg: False if v == any_value else
-                                     lambda arg: arg != v)
+                additional[k[2:]] = ((lambda arg: False) if v == any_value else
+                                     (lambda arg: arg != v))
+                DOCTESTDEBUG('added additional check for column %s != %s',
+                             k[2:], "(any value)" if v == any_value else v)
             else:
-                additional[k[1:]] = (lambda arg: True if v == any_value else
-                                     lambda arg: arg == v)
+                additional[k[1:]] = ((lambda arg: True) if v == any_value else
+                                     (lambda arg: arg == v))
+                DOCTESTDEBUG('added additional check for column %s == %s',
+                             k[1:], "(any value)" if v == any_value else v)
         elif k.startswith('!'):
             # makes no sense with any_value but honor it anyway...
             check[k[1:]] = (lambda arg: False if v == any_value else
                             lambda arg: arg != v)
+            DOCTESTDEBUG('added duplicates check for %s == %s', k, v)
         else:
             check[k] = (lambda arg: True if v == any_value else
                         lambda arg: arg != v)
+            DOCTESTDEBUG('added duplicates check for %s == %s', k, v)
     DOCTESTDEBUG('check: %s, additional: %s', check, additional)
 
     def is_duplicate(rowdict, already_built=False):
@@ -83,7 +90,7 @@ def process(all_or_all_but_one, any_value, *columns):
         '''
         query = tuple([rowdict[c] for c in check])
         if not already_built:
-            answer = query in seen
+            answer = seen[query]  # no need to `bool` it
             checked = [check[c](rowdict[c]) for c in check]
             if all(checked):
                 seen[query] += 1
@@ -97,6 +104,8 @@ def process(all_or_all_but_one, any_value, *columns):
         '''
         additional value checks beyond what counts as 'duplicate'
         '''
+        DOCTESTDEBUG('looking for match of %s in %s',
+                     [[c, rowdict[c]] for c in additional], additional)
         return all([additional[c](rowdict[c]) for c in additional])
     
     if all_or_all_but_one == 'all but one':
@@ -108,13 +117,18 @@ def process(all_or_all_but_one, any_value, *columns):
     else:
         rowbuffer = []
         DOCTESTDEBUG('testing the "all" loop')
+        DOCTESTDEBUG('first building the dictionary')
         for row in reader:
             rowbuffer.append(row)
             rowdict = OrderedDict(zip(header, row))
             is_duplicate(rowdict) # just populate the `seen` dictionary
+        DOCTESTDEBUG('now performing the checks')
         for row in rowbuffer:
             rowdict = OrderedDict(zip(header, row))
-            if (not is_duplicate(rowdict, True)) and is_match(rowdict):
+            DOCTESTDEBUG('%s is_duplicate: %s, is_match: %s', row,
+                         is_duplicate(rowdict, True),
+                         is_match(rowdict))
+            if not (is_duplicate(rowdict, True) and is_match(rowdict)):
                 writer.writerow(row)
 
 if __name__ == '__main__':
