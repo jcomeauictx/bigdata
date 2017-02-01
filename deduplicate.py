@@ -4,7 +4,7 @@ remove duplicates with (simple) condition.
 '''
 from __future__ import print_function
 import sys, os, csv, logging
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 logging.basicConfig(level=logging.DEBUG if __debug__ else logging.INFO)
 sys.setcheckinterval(1000000000)
 # http://stackoverflow.com/a/41856587/493161
@@ -23,8 +23,9 @@ def process(all_or_all_but_one, any_value, *columns):
     first arg is either 'all' or 'all but one', indicating how many rows
     should be returned. be careful using 'all' because it means that the
     entire file must be buffered before any rows can be written. and
-    the input must be `seek`able, otherwise we would have to double the
-    needed size by storing to an array.
+    we actually have to double-buffer it because the Unix pipe mechanism,
+    which is how this is intended to be used, can give an "illegal seek"
+    error. so we store the rowdicts in a buffer.
 
     next is the value which means "consider any value". the
     example below should make that clear. it removes rows where columns
@@ -50,18 +51,21 @@ def process(all_or_all_but_one, any_value, *columns):
     DOCTESTDEBUG('check: %s', check)
     additional = dict([[k[1:], check.pop(k)] for k in list(check)
                       if k.startswith('&')])
-    seen = {}
+    seen = defaultdict(int)
 
-    def is_duplicate(rowdict):
+    def is_duplicate(rowdict, already_built=False):
         '''
         inner function has a side effect, building the duplicates list as it
         goes.
         '''
         query = tuple([rowdict[c] for c in check])
-        checked = [check[c](rowdict[c]) for c in check]
-        answer = query in seen
-        if all(checked):
-            seen[query] = checked
+        if not already_built:
+            answer = query in seen
+            checked = [check[c](rowdict[c]) for c in check]
+            if all(checked):
+                seen[query] += 1
+        else:
+            answer = (seen[query] > 1)
         DOCTESTDEBUG('seen: %s, answer=%s', seen, answer)
         return answer
 
@@ -78,15 +82,15 @@ def process(all_or_all_but_one, any_value, *columns):
             if not (is_duplicate(rowdict) and is_match(rowdict)):
                 writer.writerow(row)
     else:
+        rowbuffer = []
         DOCTESTDEBUG('testing the "all" loop')
         for row in reader:
+            rowbuffer.append(row)
             rowdict = OrderedDict(zip(header, row))
-            is_duplicate(rowdict)
-        sys.stdin.seek(0)
-        reader.next()  # discard header 2nd time through
-        for row in reader:
+            is_duplicate(rowdict) # just populate the `seen` dictionary
+        for row in rowbuffer:
             rowdict = OrderedDict(zip(header, row))
-            if not (is_duplicate(rowdict) and is_match(rowdict)):
+            if not is_duplicate(rowdict, True) and is_match(rowdict)):
                 writer.writerow(row)
 
 if __name__ == '__main__':
