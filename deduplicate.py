@@ -57,6 +57,7 @@ def process(all_or_all_but_one, any_value, *columns):
     reader = csv.reader(sys.stdin)
     writer = csv.writer(sys.stdout, lineterminator='\n')
     header = reader.next()
+    writer.writerow(header)
     check, additional, seen = OrderedDict({}), OrderedDict({}), defaultdict(int)
     # sweet one-liner from http://stackoverflow.com/a/3125186/493161
     for k, v in map(None, *([iter(columns)] * 2)):
