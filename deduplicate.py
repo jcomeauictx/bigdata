@@ -32,19 +32,20 @@ def process(all_or_all_but_one, any_value, *columns):
     b and c have been output before and column c is 0.
 
     >>> from io import BytesIO
-    >>> sys.stdin = BytesIO('a,b,c\n1,2,0\n2,3,0\n3,2,0\n4,2,0\n5,2,1\n')
+    >>> sys.stdin = BytesIO('a,b,c\n1,2,0\n2,3,0\n3,2,0\n4,2,1\n5,2,1')
     >>> process('all but one', '_any_', 'b', '_any_', 'c', '0')
     1,2,0
     2,3,0
+    4,2,1
     5,2,1
 
     the next example shows that a prepended '!' to the column name reverses
     the check, and requires column c to *not* be '#'.
-    >>> sys.stdin = BytesIO('a,b,c\n1,2,0\n2,2,#\n3,3,#\n4,2,#\n')
+    >>> sys.stdin = BytesIO('a,b,c\n1,2,0\n2,2,#\n3,2,0\n4,2,#\n')
     >>> process('all but one', '_any_', 'b', '_any_', '!c', '#')
     1,2,0
     2,2,#
-    3,3,#
+    4,2,#
 
     the final example shows an additional feature, that of prepending a '&'
     to show that the column should not be counted towards duplicates but
@@ -60,9 +61,10 @@ def process(all_or_all_but_one, any_value, *columns):
     # sweet one-liner from http://stackoverflow.com/a/3125186/493161
     for k, v in map(None, *([iter(columns)] * 2)):
         if k.startswith('&'):
-            DOCTESTDEBUG('adding additional check for %s == %s', k[1:], v)
             if k[1:].startswith('!'):
-                # makes no sense with any_value but honor it anyway...
+                if v == any_value:
+                    logging.warn('%s != (any value) will always return False',
+                                 k[2:])
                 additional[k[2:]] = ((lambda arg: False) if v == any_value else
                                      (lambda arg: arg != v))
                 DOCTESTDEBUG('added additional check for column %s != %s',
@@ -73,30 +75,31 @@ def process(all_or_all_but_one, any_value, *columns):
                 DOCTESTDEBUG('added additional check for column %s == %s',
                              k[1:], "(any value)" if v == any_value else v)
         elif k.startswith('!'):
-            # makes no sense with any_value but honor it anyway...
-            check[k[1:]] = (lambda arg: False if v == any_value else
-                            lambda arg: arg != v)
+            if v == any_value:
+                logging.warn('%s != (any value) will always return False',
+                             k[1:])
+            check[k[1:]] = ((lambda arg: False) if v == any_value else
+                            (lambda arg: arg != v))
             DOCTESTDEBUG('added duplicates check for %s == %s', k, v)
         else:
-            check[k] = (lambda arg: True if v == any_value else
-                        lambda arg: arg != v)
+            check[k] = ((lambda arg: True) if v == any_value else
+                        (lambda arg: arg == v))
             DOCTESTDEBUG('added duplicates check for %s == %s', k, v)
     DOCTESTDEBUG('check: %s, additional: %s', check, additional)
 
     def is_duplicate(rowdict, already_built=False):
         '''
-        inner function has a side effect, building the duplicates list as it
-        goes.
+        counts duplicate if all checks are True
+
+        function has a side effect, building the duplicates list as it goes
         '''
         query = tuple([rowdict[c] for c in check])
         if not already_built:
-            answer = seen[query]  # no need to `bool` it
-            checked = [check[c](rowdict[c]) for c in check]
-            if all(checked):
-                seen[query] += 1
+            answer = seen[query]  # no need to `bool` it, 0 on first time seen
+            seen[query] += all([check[c](rowdict[c]) for c in check])
             DOCTESTDEBUG('seen (unbuilt): %s, answer=%s', seen, answer)
         else:
-            answer = (seen[query] > 1)
+            answer = seen[query] > 1
             DOCTESTDEBUG('seen (built): %s, answer=%s', seen, answer)
         return answer
 
